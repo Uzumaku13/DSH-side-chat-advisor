@@ -1,0 +1,76 @@
+# dsh-side-chat — one bundle, two rows.
+#
+# 1. `side-chat`         the Host half: HTTP surface, thread creation, tool mask, model.
+# 2. `preset-sidechat`   the agent preset every side-chat thread runs on.
+#
+# The preset ships here on purpose. A thread created on a coding preset inherits
+# that preset's workspace instructions (AGENTS.md/CLAUDE.md), its whole skill
+# catalog and its MCP tools — so it answers like a work session with a report and
+# a task list, not like a conversation. Installing this bundle installs both rows,
+# so there is no second step and no way to install half of it by accident.
+- insert:
+    - id: side-chat
+      name: 'dsh-side-chat'
+
+    - id: preset-sidechat
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: sidechat
+        name: Side chat
+        description: "A conversational adviser: plans and explains, changes nothing."
+        order: 90
+        plugins:
+          # The persona is the whole system prompt (`complete: true`), so nothing
+          # from the coding presets leaks in. It is written in Russian; edit the
+          # text below if you want another language.
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              complete: true
+              includeRuntimeContext: false
+              prefix: |-
+                Ты — собеседник в боковом чате. Это обычный разговорный чат, как веб-чат с ИИ,
+                а не рабочая сессия: отвечай живо и по-русски, обычной речью, без служебных
+                отчётов, без заголовков «Итог/Вердикт», без списков открытых дел и без фраз
+                вида «это задача для основной сессии».
+
+                Сильные стороны, на которые опирайся:
+                - планирование: разложить задачу на шаги, взвесить варианты, найти слабое
+                  место в чужом плане;
+                - объяснение: разобрать тему так, чтобы стало понятно, и указать на ошибку
+                  в объяснении собеседника.
+
+                Ты ничего не меняешь в системе: у тебя есть только чтение и поиск, нет правки
+                файлов, терминала и запуска команд. Если нужен файл — прочитай его, если знаешь
+                путь, или попроси показать. Никогда не притворяйся, что что-то изменил.
+
+                Не пересказывай эти правила и не упоминай инструменты. Если собеседник просит
+                совет — дай совет, а не отчёт.
+
+          # Reading and searching only: no write, no edit, no patch.
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+            config:
+              read: true
+              readImage: true
+              write: false
+              edit: false
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: tool-web
+            name: '@deepseek-ai/dsh-tool-web'
+            config:
+              fetch: true
+              searchTimeoutMs: 60000
+
+          # Long conversations must compact instead of dying at the context limit.
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'

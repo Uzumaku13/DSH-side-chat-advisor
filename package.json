@@ -1,0 +1,45 @@
+{
+  "name": "dsh-side-chat",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A chat tab in the DeepSeek Harness right sidebar: a separate conversational thread that can read and search, but never changes anything.",
+  "license": "MIT",
+  "author": "Ivan",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "chat",
+    "agent-preset",
+    "voice-input"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md",
+    "README.ru.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar-right",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-session"
+      ]
+    }
+  }
+}
