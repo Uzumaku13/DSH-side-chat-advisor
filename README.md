@@ -224,6 +224,11 @@ Plain JavaScript, no build step.
 
 Before publishing a fork, set `author` in `package.json` and add a `repository` field.
 
+## Contributing
+
+Bug reports, ideas and patches are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for
+how the two halves fit together, how to reload them, and what a useful report contains.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

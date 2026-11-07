@@ -1,0 +1,89 @@
+name: Bug report
+description: Something in the side chat does not behave as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Two things make a bug reproducible much faster:
+        the plugin's own JSON state, and any `[side-chat]` lines from the host log.
+
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+      description: From package.json, or the release you installed
+      placeholder: 1.0.0
+    validations:
+      required: true
+
+  - type: input
+    id: dsh
+    attributes:
+      label: DSH version and OS
+      placeholder: DSH 0.2.2-rc.1, Windows 11
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does it happen?
+      multiple: true
+      options:
+        - Opening the panel or creating a thread
+        - The transcript (wrong or missing messages)
+        - The tool mask (the chat could change something)
+        - Settings (reasoning level, launcher toggle)
+        - Voice input
+        - Images
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead?
+      description: Screen text, the panel's error line, or a screenshot
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a session
+        2. Click the speech-bubble button in the header
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: state
+    attributes:
+      label: Plugin state
+      description: |
+        Output of these routes (they contain ids and settings only, no message text):
+        GET /x-side-chat/settings.json
+        GET /x-side-chat/status.json
+      render: json
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Host log lines
+      description: Any lines containing `[side-chat]`
+      render: text
+    validations:
+      required: false
