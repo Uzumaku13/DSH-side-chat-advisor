@@ -45,7 +45,7 @@ This plugin gives you a second thread that:
 ## Install
 
 ```bash
-git clone https://github.com/YOURNAME/dsh-side-chat.git
+git clone https://github.com/Uzumaku13/DSH-side-chat-advisor.git
 ```
 
 Then, from a DSH session, install the directory as a bundle (the tool performs package

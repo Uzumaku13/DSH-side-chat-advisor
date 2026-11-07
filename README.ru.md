@@ -47,7 +47,7 @@
 ## Установка
 
 ```bash
-git clone https://github.com/YOURNAME/dsh-side-chat.git
+git clone https://github.com/Uzumaku13/DSH-side-chat-advisor.git
 ```
 
 Затем из сессии DSH установить каталог как бандл:

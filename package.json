@@ -4,7 +4,15 @@
   "type": "module",
   "description": "A chat tab in the DeepSeek Harness right sidebar: a separate conversational thread that can read and search, but never changes anything.",
   "license": "MIT",
-  "author": "Ivan",
+  "author": "Ivan Belyaev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Uzumaku13/DSH-side-chat-advisor.git"
+  },
+  "homepage": "https://github.com/Uzumaku13/DSH-side-chat-advisor#readme",
+  "bugs": {
+    "url": "https://github.com/Uzumaku13/DSH-side-chat-advisor/issues"
+  },
   "keywords": [
     "deepseek-harness",
     "dsh",
