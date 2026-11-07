@@ -95,6 +95,47 @@ window.__ModuleLoader__.load({
         assistant: 'assistant',
         tool: 'tool',
       },
+      zh: {
+        tabTitle: '侧边对话',
+        open: '打开侧边对话',
+        empty: '顾问：会阅读、解释和规划，但不会改动任何东西。',
+        placeholder: '在不打断工作会话的情况下提问…',
+        attach: '附加图片',
+        remove: '移除',
+        mic: '语音输入',
+        micStop: '停止录音',
+        micFailed: '无法识别语音',
+        micEmpty: '没有识别到语音，请再试一次',
+        settingsTitle: '侧边对话',
+        settingsAbout: '右侧面板里的独立对话：可以读取文件、搜索，但不会做任何修改。这里选择它在回答前思考的程度。',
+        effortLoading: '正在读取设置…',
+        effortLabel: '推理强度',
+        effortHint: '模型在回答前思考的程度。「关闭」最省最快；复杂的规划建议 Low 或 High。只影响侧边对话，不影响工作会话。',
+        effortSaved: '已保存',
+        effortSaving: '正在应用…',
+        effortModel: '模型',
+        hideLauncher: '隐藏 Claude Migration 按钮',
+        hideLauncherHint: '隐藏 dsh-claude-move 插件注入的浮动按钮。该插件及其工具仍然可用。设置保存在本浏览器中。',
+        'effort.off': '关闭 — 快速且省',
+        'effort.minimal': 'Minimal — 最小',
+        'effort.low': 'Low — 简短思考',
+        'effort.medium': 'Medium — 中等',
+        'effort.high': 'High — 深入',
+        'effort.xhigh': 'XHigh — 非常深入',
+        'effort.max': 'Max — 最大',
+        send: '发送',
+        stop: '停止',
+        newThread: '新对话',
+        creating: '正在创建独立对话…',
+        createFailed: '无法创建独立对话',
+        loading: '正在加载对话…',
+        failed: '无法连接到对话',
+        separate: '独立对话',
+        adviser: '顾问 · 只读',
+        you: '你',
+        assistant: '助手',
+        tool: '工具',
+      },
     };
 
     const CSS = `
@@ -203,10 +244,12 @@ window.__ModuleLoader__.load({
       let lang = 'ru';
       try {
         const snapshot = ctx.locale.getLocale();
-        if (snapshot && typeof snapshot.id === 'string') lang = snapshot.id.slice(0, 2);
+        // 'zh-CN' / 'en-US' / 'pt-BR' all resolve by their primary subtag.
+        if (snapshot && typeof snapshot.id === 'string') lang = snapshot.id.slice(0, 2).toLowerCase();
       } catch { /* Russian by default */ }
-      const dict = FALLBACK[lang] || FALLBACK.en;
-      return (key) => dict[key] || FALLBACK.en[key] || key;
+      const dict = FALLBACK[lang];
+      const fallback = FALLBACK.en;
+      return (key) => (dict && dict[key]) || fallback[key] || key;
     }
 
     function sessionApi(ctx) {

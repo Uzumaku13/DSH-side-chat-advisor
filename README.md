@@ -1,11 +1,15 @@
 # dsh-side-chat
 
+English | [Русский](README.ru.md) | [中文](README.zh.md)
+
 A chat tab in the [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) right sidebar:
 a **separate conversation** that sits next to your working session, can read and search,
 and **cannot change anything**.
 
 Think of it as the AI chat you keep open in a browser tab — except it lives inside DSH,
 already knows which project you are in, and never touches your files.
+
+![The side chat docked in the right panel: its own tab, an empty state that states the rules, and a composer with voice and image buttons](docs/side-chat-panel.png)
 
 ---
 

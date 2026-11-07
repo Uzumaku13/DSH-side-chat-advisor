@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] — 2026-11-07
+
+### Added
+
+- **Chinese UI** (`zh`): panel, settings card and effort labels. The dictionary is keyed by
+  the DSH locale's primary subtag, so `zh-CN` / `zh-Hans` resolve to it; languages without a
+  dictionary fall back to English.
+- The bundled persona now answers in the language it is addressed in (Russian, English or
+  Chinese) instead of always Russian.
+- A screenshot in all three READMEs.
+
+### Changed
+
+- `README.zh.md` added; every README starts with a language bar.
+
 ## [1.0.0] — 2026-11-07
 
 First public release.
