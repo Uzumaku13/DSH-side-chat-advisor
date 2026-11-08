@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.1] — 2026-11-08
+
+### Changed
+
+- The composer grows with the draft instead of staying one line tall, and starts scrolling
+  inside itself after about eight lines. Height is measured from `scrollHeight`, so wrapped
+  paragraphs grow correctly too; the field returns to one line when the draft is cleared.
+- The placeholder truncates with an ellipsis instead of wrapping in the narrow panel.
+
 ## [1.2.0] — 2026-11-08
 
 ### Added

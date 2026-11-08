@@ -238,9 +238,12 @@ window.__ModuleLoader__.load({
         font-size:11px; line-height:14px; cursor:pointer; }
       .dshsc__foot { flex:0 0 auto; display:flex; gap:6px; padding:8px;
         border-top:1px solid var(--dsw-alias-border-l1); align-items:flex-end; }
-      .dshsc__input { flex:1 1 auto; min-height:32px; max-height:140px; resize:none;
-        padding:6px 9px; border-radius:8px; border:1px solid var(--dsw-alias-border-l1);
-        background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-primary); font:inherit; }
+      .dshsc__input { flex:1 1 auto; min-height:32px; max-height:none; resize:none; overflow-y:hidden;
+        box-sizing:border-box; line-height:20px; padding:6px 9px; border-radius:8px;
+        border:1px solid var(--dsw-alias-border-l1);
+        background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-primary); font:inherit;
+        transition:height .08s ease-out; }
+      .dshsc__input::placeholder { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .dshsc__input:focus { outline:none; border-color:var(--dsw-alias-brand-primary); }
       .dshsc__send { flex:0 0 auto; padding:0 12px; height:32px; border-radius:8px; cursor:pointer;
         border:1px solid var(--dsw-alias-border-l1); background:var(--dsw-alias-bg-layer-2);
@@ -545,6 +548,7 @@ window.__ModuleLoader__.load({
         const [transcribing, setTranscribing] = useState(false);
         const audioRef = useRef(null);
         const fileInputRef = useRef(null);
+        const inputRef = useRef(null);
         const bodyRef = useRef(null);
         const stickRef = useRef(true);
         const recreateGuard = useRef(0);
@@ -671,6 +675,18 @@ window.__ModuleLoader__.load({
           if (!node) return;
           stickRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 48;
         };
+
+        // Grow the composer with the draft, up to a ceiling; past it the field scrolls.
+        // Measured rather than counted in lines: wrapped paragraphs then grow correctly.
+        useEffect(() => {
+          const node = inputRef.current;
+          if (!node) return;
+          const max = 168;
+          node.style.height = 'auto';
+          const next = Math.min(node.scrollHeight, max);
+          node.style.height = next + 'px';
+          node.style.overflowY = node.scrollHeight > max ? 'auto' : 'hidden';
+        }, [draft, threadId, images.length]);
 
         const loadHistory = useCallback(async () => {
           setHistory((prev) => ({ ...prev, loading: true }));
@@ -1034,6 +1050,7 @@ window.__ModuleLoader__.load({
                   onChange: onFiles,
                 }),
                 h('textarea', {
+                  ref: inputRef,
                   className: 'dshsc__input',
                   value: draft,
                   placeholder: t('placeholder'),
