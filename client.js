@@ -334,6 +334,7 @@ window.__ModuleLoader__.load({
         const legacy = window.localStorage.getItem(LEGACY_KEY);
         if (legacy) {
           window.localStorage.setItem(threadKey(workingSessionId), legacy);
+          window.localStorage.removeItem(LEGACY_KEY);
           return legacy;
         }
       } catch { /* private mode or storage disabled */ }
@@ -343,24 +344,30 @@ window.__ModuleLoader__.load({
       try { window.localStorage.setItem(threadKey(workingSessionId), id); } catch { /* keep in memory */ }
     }
     function dropStoredThread(workingSessionId) {
-      try { window.localStorage.removeItem(threadKey(workingSessionId)); } catch { /* nothing to drop */ }
+      try {
+        window.localStorage.removeItem(threadKey(workingSessionId));
+        // Drop the pre-1.2 key too: while it exists, adopting it would resurrect the
+        // previous thread right after "+" cleared the pointer.
+        window.localStorage.removeItem(LEGACY_KEY);
+      } catch { /* nothing to drop */ }
     }
 
     /**
      * One resolution per page, shared by every mount. The tab body is remounted by the
      * right column, so a per-component in-flight flag would abandon the request and
      * mint a new Session on each remount — that is exactly how stray threads appeared.
-     *
-     * Order: this session's remembered thread → this session's newest bound thread →
-     * create. A free thread is never adopted silently; it is reachable from history.
+     * With `fresh` the caller wants a brand-new thread ("+"), so nothing is adopted:
+     * no remembered id and no pinned thread.
      */
     let threadPromise = null;
-    function ensureThread(workingSessionId) {
-      const stored = readStoredThread(workingSessionId);
-      if (stored !== '') return Promise.resolve({ id: stored, masked: null });
+    function ensureThread(workingSessionId, fresh) {
+      if (fresh !== true) {
+        const stored = readStoredThread(workingSessionId);
+        if (stored !== '') return Promise.resolve({ id: stored, masked: null });
+      }
       if (threadPromise !== null) return threadPromise;
       threadPromise = (async () => {
-        if (workingSessionId) {
+        if (fresh !== true && workingSessionId) {
           try {
             const url = '/x-side-chat/threads.json?owner=' + encodeURIComponent(workingSessionId);
             const page = await (await fetch(url)).json();
@@ -554,15 +561,19 @@ window.__ModuleLoader__.load({
         const bodyRef = useRef(null);
         const stickRef = useRef(true);
         const recreateGuard = useRef(0);
+        /** Set by "+": the next resolution must create, not adopt. */
+        const freshRef = useRef(false);
 
         // The host owns thread creation, so it can apply the adviser mask before the
         // first turn; the panel only asks for an id and remembers it.
         useEffect(() => {
           if (threadId !== '') return undefined;
           let alive = true;
+          const fresh = freshRef.current;
+          freshRef.current = false;
           setCreating(true);
           setCreateError('');
-          ensureThread(workingSessionId)
+          ensureThread(workingSessionId, fresh)
             .then((thread) => {
               if (!alive) return;
               setThreadId(thread.id);
@@ -757,6 +768,7 @@ window.__ModuleLoader__.load({
         const newThread = useCallback(() => {
           recreateGuard.current = 0;
           threadPromise = null;
+          freshRef.current = true;
           dropStoredThread(workingSessionId);
           setItems([]);
           setLive('');

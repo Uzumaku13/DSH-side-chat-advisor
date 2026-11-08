@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.1] — 2026-11-08
+
+### Fixed
+
+- **`+` did nothing.** Two causes, both fixed: the pre-1.2 storage key was still present in
+  the browser, and dropping the current pointer made the panel adopt that legacy id right
+  back; and resolution preferred this session's pinned thread, so "+" could reopen it instead
+  of creating a new conversation. Resolution now takes a `fresh` flag that skips both, and the
+  legacy key is deleted the moment it is adopted (and when a pointer is dropped).
+
 ## [1.3.0] — 2026-11-08
 
 ### Changed
