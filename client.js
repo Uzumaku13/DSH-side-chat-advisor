@@ -53,6 +53,16 @@ window.__ModuleLoader__.load({
         you: 'ты',
         assistant: 'ассистент',
         tool: 'инструмент',
+        history: 'История чатов',
+        historyBound: 'Привязанные к этой сессии',
+        historyFree: 'Свободные',
+        historyEmpty: 'Пока пусто',
+        untitled: 'Без названия',
+        bound: 'привязан',
+        free: 'свободный',
+        bind: 'Привязать к этой сессии',
+        freeIt: 'Отвязать — сделать свободным',
+        forget: 'Убрать из истории',
       },
       en: {
         tabTitle: 'Side chat',
@@ -94,6 +104,16 @@ window.__ModuleLoader__.load({
         you: 'you',
         assistant: 'assistant',
         tool: 'tool',
+        history: 'Chat history',
+        historyBound: 'Bound to this session',
+        historyFree: 'Free',
+        historyEmpty: 'Nothing yet',
+        untitled: 'Untitled',
+        bound: 'bound',
+        free: 'free',
+        bind: 'Bind to this session',
+        freeIt: 'Unbind — make it free',
+        forget: 'Remove from history',
       },
       zh: {
         tabTitle: '侧边对话',
@@ -135,12 +155,43 @@ window.__ModuleLoader__.load({
         you: '你',
         assistant: '助手',
         tool: '工具',
+        history: '对话历史',
+        historyBound: '绑定到本会话',
+        historyFree: '自由对话',
+        historyEmpty: '还没有',
+        untitled: '未命名',
+        bound: '已绑定',
+        free: '自由',
+        bind: '绑定到本会话',
+        freeIt: '解绑 — 设为自由',
+        forget: '从历史中移除',
       },
     };
 
     const CSS = `
-      .dshsc { display:flex; flex-direction:column; height:100%; min-height:0;
+      .dshsc { display:flex; flex-direction:column; height:100%; min-height:0; position:relative;
         color:var(--dsw-alias-label-primary); font-size:13px; line-height:20px; }
+      .dshsc-hist { position:absolute; top:42px; left:8px; right:8px; z-index:20; max-height:60%;
+        overflow:auto; padding:8px; border-radius:10px; border:1px solid var(--dsw-alias-border-l1);
+        background:var(--dsw-alias-bg-overlay); box-shadow:0 12px 28px rgba(0,0,0,.22); }
+      .dshsc-hist__head { font-size:12px; text-transform:uppercase; letter-spacing:.04em; opacity:.6;
+        padding:2px 4px 6px; }
+      .dshsc-hist__sect { display:flex; flex-direction:column; gap:2px; margin-top:6px; }
+      .dshsc-hist__label { font-size:11px; text-transform:uppercase; letter-spacing:.04em;
+        color:var(--dsw-alias-label-secondary); padding:4px 4px 2px; }
+      .dshsc-hist__empty { font-size:12px; color:var(--dsw-alias-label-secondary); padding:2px 4px 4px; }
+      .dshsc-hist__row { display:flex; align-items:center; gap:2px; border-radius:8px; }
+      .dshsc-hist__row:hover { background:var(--dsw-alias-bg-layer-2); }
+      .dshsc-hist__row--on { background:var(--dsw-alias-bg-layer-2); }
+      .dshsc-hist__open { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:1px;
+        padding:6px 8px; border:none; background:none; cursor:pointer; text-align:left; font:inherit;
+        color:var(--dsw-alias-label-primary); }
+      .dshsc-hist__title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; }
+      .dshsc-hist__meta { font-size:11px; color:var(--dsw-alias-label-secondary); }
+      .dshsc-hist__act { flex:0 0 auto; width:22px; height:22px; padding:0; border:none; border-radius:6px;
+        background:none; cursor:pointer; color:var(--dsw-alias-label-secondary); font-size:14px; line-height:1; }
+      .dshsc-hist__act:hover { background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-primary); }
+      .dshsc__icon--on { background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-primary); }
       .dshsc__head { flex:0 0 auto; display:flex; align-items:center; gap:8px;
         padding:10px 12px; border-bottom:1px solid var(--dsw-alias-border-l1); font-weight:500; }
       .dshsc__head .dshsc__grow { flex:1 1 auto; }
@@ -263,27 +314,59 @@ window.__ModuleLoader__.load({
       return undefined;
     }
 
-    function readStoredThread() {
-      try { return window.localStorage.getItem(STORAGE_KEY) || ''; } catch { return ''; }
+    // One remembered thread per working session, so opening the panel in a session
+    // returns to that session's own conversation instead of a global "last one".
+    const STORAGE_PREFIX = 'dsh.side-chat.thread.v3.';
+    const LEGACY_KEY = 'dsh.side-chat.thread.v2';
+
+    function threadKey(workingSessionId) {
+      return STORAGE_PREFIX + (workingSessionId || 'free');
     }
-    function storeThread(id) {
-      try { window.localStorage.setItem(STORAGE_KEY, id); } catch { /* keep in memory */ }
+    function readStoredThread(workingSessionId) {
+      try {
+        const own = window.localStorage.getItem(threadKey(workingSessionId));
+        if (own) return own;
+        // Adopt the v1/v2 single-thread key once, so an upgrade keeps its conversation.
+        const legacy = window.localStorage.getItem(LEGACY_KEY);
+        if (legacy) {
+          window.localStorage.setItem(threadKey(workingSessionId), legacy);
+          return legacy;
+        }
+      } catch { /* private mode or storage disabled */ }
+      return '';
     }
-    function dropStoredThread() {
-      try { window.localStorage.removeItem(STORAGE_KEY); } catch { /* nothing to drop */ }
+    function storeThread(workingSessionId, id) {
+      try { window.localStorage.setItem(threadKey(workingSessionId), id); } catch { /* keep in memory */ }
+    }
+    function dropStoredThread(workingSessionId) {
+      try { window.localStorage.removeItem(threadKey(workingSessionId)); } catch { /* nothing to drop */ }
     }
 
     /**
-     * One creation per page, shared by every mount. The tab body is remounted by the
+     * One resolution per page, shared by every mount. The tab body is remounted by the
      * right column, so a per-component in-flight flag would abandon the request and
      * mint a new Session on each remount — that is exactly how stray threads appeared.
+     *
+     * Order: this session's remembered thread → this session's newest bound thread →
+     * create. A free thread is never adopted silently; it is reachable from history.
      */
     let threadPromise = null;
     function ensureThread(workingSessionId) {
-      const stored = readStoredThread();
+      const stored = readStoredThread(workingSessionId);
       if (stored !== '') return Promise.resolve({ id: stored, masked: null });
       if (threadPromise !== null) return threadPromise;
       threadPromise = (async () => {
+        if (workingSessionId) {
+          try {
+            const url = '/x-side-chat/threads.json?owner=' + encodeURIComponent(workingSessionId);
+            const page = await (await fetch(url)).json();
+            const bound = page && page.ok && page.value && Array.isArray(page.value.bound) ? page.value.bound : [];
+            if (bound.length > 0 && typeof bound[0].id === 'string') {
+              storeThread(workingSessionId, bound[0].id);
+              return { id: bound[0].id, masked: null };
+            }
+          } catch { /* fall through to creation */ }
+        }
         const response = await fetch('/x-side-chat/thread', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -294,8 +377,8 @@ window.__ModuleLoader__.load({
         const value = payload.value || {};
         const id = value.sessionId;
         if (typeof id !== 'string' || id === '') throw new Error('хост вернул пустой sessionId');
-        storeThread(id);
-        return { id, masked: value.masked === true };
+        storeThread(workingSessionId, id);
+        return { id, masked: value.masked === true, model: value.model };
       })();
       threadPromise.catch(() => { threadPromise = null; });
       return threadPromise;
@@ -443,11 +526,13 @@ window.__ModuleLoader__.load({
 
       function SideChatBody(props) {
         const workingSessionId = props.sessionId;
-        const [threadId, setThreadId] = useState(() => readStoredThread());
+        const [threadId, setThreadId] = useState(() => readStoredThread(props.sessionId));
         const [creating, setCreating] = useState(false);
         const [createError, setCreateError] = useState('');
         const [attempt, setAttempt] = useState(0);
         const [masked, setMasked] = useState(null);
+        const [historyOpen, setHistoryOpen] = useState(false);
+        const [history, setHistory] = useState({ loading: false, bound: [], free: [] });
 
         const [items, setItems] = useState([]);
         const [live, setLive] = useState('');
@@ -587,10 +672,74 @@ window.__ModuleLoader__.load({
           stickRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 48;
         };
 
+        const loadHistory = useCallback(async () => {
+          setHistory((prev) => ({ ...prev, loading: true }));
+          try {
+            const url = '/x-side-chat/threads.json?owner=' + encodeURIComponent(workingSessionId || '');
+            const page = await (await fetch(url)).json();
+            if (!page || page.ok !== true) throw new Error((page && page.error) || 'history failed');
+            const value = page.value || {};
+            setHistory({
+              loading: false,
+              bound: Array.isArray(value.bound) ? value.bound : [],
+              free: Array.isArray(value.free) ? value.free : [],
+            });
+          } catch (thrown) {
+            setHistory({ loading: false, bound: [], free: [] });
+            setError((thrown && thrown.message) || String(thrown));
+          }
+        }, [workingSessionId]);
+
+        const openHistory = () => {
+          const next = !historyOpen;
+          setHistoryOpen(next);
+          if (next) loadHistory();
+        };
+
+        const selectThread = (id) => {
+          storeThread(workingSessionId, id);
+          setThreadId(id);
+          setHistoryOpen(false);
+        };
+
+        const changeBinding = async (item, action) => {
+          try {
+            await fetch('/x-side-chat/threads', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ sessionId: item.id, action, owner: workingSessionId }),
+            });
+            await loadHistory();
+          } catch (thrown) {
+            setError((thrown && thrown.message) || String(thrown));
+          }
+        };
+
+        const forgetThread = async (item) => {
+          try {
+            await fetch('/x-side-chat/threads', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ sessionId: item.id, action: 'forget' }),
+            });
+            // The Session log stays on disk; only the history entry goes away.
+            if (item.id === threadId) {
+              dropStoredThread(workingSessionId);
+              threadPromise = null;
+              recreateGuard.current = 0;
+              setThreadId('');
+              setAttempt((value) => value + 1);
+            }
+            await loadHistory();
+          } catch (thrown) {
+            setError((thrown && thrown.message) || String(thrown));
+          }
+        };
+
         const newThread = useCallback(() => {
           recreateGuard.current = 0;
           threadPromise = null;
-          dropStoredThread();
+          dropStoredThread(workingSessionId);
           setItems([]);
           setLive('');
           setRunning(false);
@@ -599,7 +748,7 @@ window.__ModuleLoader__.load({
           setStatus('idle');
           setThreadId('');
           setAttempt((value) => value + 1);
-        }, []);
+        }, [workingSessionId]);
 
         const send = async () => {
           const text = draft.trim();
@@ -742,11 +891,76 @@ window.__ModuleLoader__.load({
           h('div', { className: 'dshsc__text' }, item.text),
         ));
 
+        const timeLabel = (value) => {
+          if (!value) return '';
+          try {
+            return new Date(value).toLocaleString(undefined, {
+              day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+            });
+          } catch {
+            return '';
+          }
+        };
+
+        const historyRow = (item) => h('div', {
+          key: item.id,
+          className: 'dshsc-hist__row' + (item.id === threadId ? ' dshsc-hist__row--on' : ''),
+        },
+        h('button', { className: 'dshsc-hist__open', type: 'button', onClick: () => selectThread(item.id) },
+          h('span', { className: 'dshsc-hist__title' }, item.title || t('untitled')),
+          h('span', { className: 'dshsc-hist__meta' }, (item.owner ? t('bound') : t('free')) + ' · ' + timeLabel(item.createdAt)),
+        ),
+        h('button', {
+          className: 'dshsc-hist__act',
+          type: 'button',
+          title: item.owner ? t('freeIt') : t('bind'),
+          'aria-label': item.owner ? t('freeIt') : t('bind'),
+          onClick: () => changeBinding(item, item.owner ? 'unbind' : 'bind'),
+        }, h('svg', { viewBox: '0 0 24 24', width: 13, height: 13, fill: 'none', 'aria-hidden': true },
+          h('path', {
+            d: item.owner ? 'M9 15l6-6M8.5 8.5l-1.7 1.7a4.2 4.2 0 0 0 5.9 5.9l1.7-1.7M15.5 15.5l1.7-1.7a4.2 4.2 0 0 0-5.9-5.9l-1.7 1.7' : 'M9.5 14.5l5-5M8 12l-2 2a4 4 0 0 0 5.6 5.6l2-2M16 12l2-2a4 4 0 0 0-5.6-5.6l-2 2',
+            stroke: 'currentColor', 'stroke-width': '1.6', 'stroke-linecap': 'round',
+          }))),
+        h('button', {
+          className: 'dshsc-hist__act',
+          type: 'button',
+          title: t('forget'),
+          'aria-label': t('forget'),
+          onClick: () => forgetThread(item),
+        }, '×'),
+        );
+
+        const historySection = (label, items2) => h('div', { className: 'dshsc-hist__sect' },
+          h('div', { className: 'dshsc-hist__label' }, label),
+          items2.length === 0
+            ? h('div', { className: 'dshsc-hist__empty' }, t('historyEmpty'))
+            : items2.map(historyRow),
+        );
+
+        const historyPopover = historyOpen ? h('div', { className: 'dshsc-hist' },
+          h('div', { className: 'dshsc-hist__head' }, t('history')),
+          history.loading ? h('div', { className: 'dshsc-hist__empty' }, t('loading')) : null,
+          historySection(t('historyBound'), history.bound),
+          historySection(t('historyFree'), history.free),
+        ) : null;
+
         return h('div', { className: 'dshsc' },
           h('div', { className: 'dshsc__head' },
             h('span', null, t('tabTitle')),
             h('span', { className: 'dshsc__sub' }, masked === false ? t('separate') : t('adviser')),
             h('span', { className: 'dshsc__grow' }),
+            h('button', {
+              className: 'dshsc__icon' + (historyOpen ? ' dshsc__icon--on' : ''),
+              type: 'button',
+              title: t('history'),
+              'aria-label': t('history'),
+              'aria-expanded': historyOpen,
+              onClick: openHistory,
+            }, h('svg', { viewBox: '0 0 24 24', width: 14, height: 14, fill: 'none', 'aria-hidden': true },
+              h('path', {
+                d: 'M12 7v5l3 2M12 3a9 9 0 1 1-9 9',
+                stroke: 'currentColor', 'stroke-width': '1.7', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+              }))),
             h('button', {
               className: 'dshsc__icon',
               type: 'button',
@@ -756,6 +970,7 @@ window.__ModuleLoader__.load({
             }, h('svg', { viewBox: '0 0 24 24', width: 14, height: 14, fill: 'none', 'aria-hidden': true },
               h('path', { d: 'M12 5v14M5 12h14', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round' }))),
           ),
+          historyPopover,
           h('div', { className: 'dshsc__body', ref: bodyRef, onScroll },
             creating ? h('div', { className: 'dshsc__muted' }, t('creating')) : null,
             createError !== '' ? h('div', { className: 'dshsc__err' }, t('createFailed') + ': ' + createError) : null,

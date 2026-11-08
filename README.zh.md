@@ -124,6 +124,24 @@ plugin_manager
 preset 只提供读取工具；此外宿主在每次创建 agent 时用显式白名单调用 `tools.restrict`。
 任意一层单独都够用；两层同时存在意味着以后改 preset 不会意外给对话一个终端。
 
+### 历史与绑定
+
+每个线程只属于一个位置：
+
+- **已绑定**——从某个会话创建，之后在该会话里打开面板时会回到它；
+- **自由**——没有归属，在任何会话的历史里都能看到。
+
+**「+」不会删除任何东西。** 它会新建一个绑定到当前会话的线程并切换过去，之前的那个留在
+历史列表里，标题取自它的第一条消息。
+
+面板标题栏的时钟按钮打开历史：*绑定到本会话* 与 *自由对话*。点击条目切换，链接图标用于
+绑定或解绑，`×` 从列表中移除。移除条目**不会**删除对话——那是普通的 DSH 会话，日志会一直
+留在磁盘上，直到你手动删除（`$DSH_HOME/sessions/<id>`）。会话已被删除的条目会在下次打开
+历史时自动清理。
+
+标题取自每个线程的第一条人类消息并缓存到登记表，因此打开历史时每个无标题线程只多一次
+日志读取，之后为零。
+
 ### 为什么预置一起打包
 
 agent preset 决定哪些内容进入模型。如果用编码 preset 创建线程，它会继承工作区的
@@ -147,14 +165,17 @@ agent preset 决定哪些内容进入模型。如果用编码 preset 创建线�
 | `GET /x-side-chat/models.json` | 模型目录 |
 | `GET /x-side-chat/tools.json` | 线程可见的工具名（调试掩码） |
 | `GET /x-side-chat/status.json` | 已知线程 |
+| `GET /x-side-chat/threads.json?owner=` | 历史：绑定到某会话的线程加自由线程 |
+| `POST /x-side-chat/threads` | 对单个线程执行 `bind` / `unbind` / `forget` |
+| `GET /x-side-chat/eventpage.json` | 诊断：某线程的日志页返回什么 |
 
 ### 写入磁盘的内容
 
 | 路径 | 内容 |
 |---|---|
-| `$DSH_HOME/side-chat/threads.json` | 线程 id（用于重新套用掩码） |
+| `$DSH_HOME/side-chat/threads.json` | 线程记录：id、归属、标题、时间（也是掩码用的清单） |
 | `$DSH_HOME/side-chat/settings.json` | 推理强度 |
-| `localStorage: dsh.side-chat.thread.v2` | 面板显示的线程 |
+| `localStorage: dsh.side-chat.thread.v3.<会话>` | 该会话下面板显示的线程 |
 | `localStorage: dsh.side-chat.hide-claude-launcher` | 隐藏按钮的开关 |
 
 对话本身是普通的 DSH 会话日志，没有第二份副本。

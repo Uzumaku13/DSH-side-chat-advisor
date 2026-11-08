@@ -103,24 +103,46 @@ export function apply(ctx) {
   let settings = readSettings()
   const currentEffort = () => settings.reasoningEffort || DEFAULT_EFFORT
 
+  /**
+   * Thread registry. v1 stored a bare array of ids; v2 keeps a record per thread so the
+   * panel can show history and binding. Reading accepts both shapes.
+   */
   const loadThreads = () => {
     try {
       const parsed = JSON.parse(fs.readFileSync(storePath, 'utf8'))
-      return new Set(Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : [])
+      const rows = Array.isArray(parsed)
+        ? parsed
+        : (parsed && Array.isArray(parsed.threads) ? parsed.threads : [])
+      const records = []
+      for (const row of rows) {
+        if (typeof row === 'string' && row !== '') {
+          records.push({ id: row, owner: null, title: '', createdAt: 0 })
+        } else if (row && typeof row.id === 'string' && row.id !== '') {
+          records.push({
+            id: row.id,
+            owner: typeof row.owner === 'string' && row.owner !== '' ? row.owner : null,
+            title: typeof row.title === 'string' ? row.title : '',
+            createdAt: typeof row.createdAt === 'number' ? row.createdAt : 0,
+          })
+        }
+      }
+      return records
     } catch {
-      return new Set()
+      return []
     }
   }
   const saveThreads = () => {
     try {
       fs.mkdirSync(path.dirname(storePath), { recursive: true })
-      fs.writeFileSync(storePath, JSON.stringify([...threads], null, 2), 'utf8')
+      fs.writeFileSync(storePath, JSON.stringify({ version: 2, threads }, null, 2), 'utf8')
     } catch (error) {
       console.warn('[side-chat] could not persist threads: %s', (error && error.message) || error)
     }
   }
 
+  /** Newest first; the mask and every bulk operation read this list. */
   const threads = loadThreads()
+  const findThread = (sessionId) => threads.find((row) => row && row.id === sessionId)
   /** Agents that already received the adviser role text, so a re-mask does not duplicate it. */
   const prompted = new WeakSet()
 
@@ -214,11 +236,86 @@ export function apply(ctx) {
     }
   }
 
-  const remember = (sessionId) => {
-    if (!threads.has(sessionId)) {
-      threads.add(sessionId)
+  const remember = (sessionId, owner) => {
+    if (typeof sessionId !== 'string' || sessionId === '') return
+    const existing = findThread(sessionId)
+    if (existing) {
+      if (owner !== undefined) existing.owner = owner
       saveThreads()
+      return
     }
+    threads.push({
+      id: sessionId,
+      owner: typeof owner === 'string' && owner !== '' ? owner : null,
+      title: '',
+      createdAt: Date.now(),
+    })
+    saveThreads()
+  }
+
+  const forget = (sessionId) => {
+    const index = threads.findIndex((row) => row && row.id === sessionId)
+    if (index === -1) return false
+    threads.splice(index, 1)
+    saveThreads()
+    return true
+  }
+
+  /** Sentinel: the thread's Session no longer exists, so the entry is dead weight. */
+  const MISSING = Symbol('missing')
+
+  /**
+   * First human message of a thread, or '' when the page holds none.
+   * `throughSeq` asks for the opening turn; harmless to omit when it yields nothing.
+   */
+  const firstUserText = async (record, throughSeq) => {
+    const controller = service(ctx, 'sessionController')
+    if (!controller || typeof controller.events !== 'function') return ''
+    const request = { address: { kind: 'session', sessionId: record.id }, maxMessages: 12 }
+    if (throughSeq !== undefined) request.throughSeq = throughSeq
+    const page = await controller.events(request, new AbortController().signal)
+    for (const entry of (page && page.records) || []) {
+      const event = entry && entry.event
+      if (!event || event.type !== 'user/message') continue
+      const kind = event.data && event.data.source ? event.data.source.kind : undefined
+      if (kind !== undefined && kind !== 'user') continue
+      const content = event.data && event.data.content
+      const text = Array.isArray(content)
+        ? content.filter((block) => block && block.type === 'text').map((block) => block.text).join(' ')
+        : ''
+      const clean = text.replace(/\s+/g, ' ').trim()
+      if (clean !== '') return clean
+    }
+    return ''
+  }
+
+  /**
+   * A thread's title, taken from its first human message and cached in the registry.
+   * Returns MISSING when the Session is gone, so the caller can drop the entry.
+   */
+  const titleOf = async (record) => {
+    if (!record) return ''
+    if (record.title) return record.title
+    const missing = (error) => /not found|not-found|no such|unknown session|expired/i.test((error && error.message) || String(error))
+    let text = ''
+    // Each attempt is isolated: a rejected `throughSeq` must not cancel the fallback.
+    try {
+      text = await firstUserText(record, 64)
+    } catch (error) {
+      if (missing(error)) return MISSING
+    }
+    if (text === '') {
+      try {
+        text = await firstUserText(record)
+      } catch (error) {
+        if (missing(error)) return MISSING
+        return ''
+      }
+    }
+    if (text === '') return ''
+    record.title = text.length > 64 ? text.slice(0, 61) + '…' : text
+    saveThreads()
+    return record.title
   }
 
   /**
@@ -312,19 +409,18 @@ export function apply(ctx) {
     // Name the Session ourselves and remember it *before* creation, so the
     // `agent/created` hook already knows this agent is an adviser.
     const wanted = 'session-' + randomUUID()
-    remember(wanted)
+    remember(wanted, workingSessionId)
     const request = { sessionId: wanted, agentPreset: PRESET_ID }
     if (cwd !== undefined) request.cwd = cwd
     const created = await controller.create(request)
     const sessionId = created && created.sessionId
     if (typeof sessionId !== 'string' || sessionId === '') {
-      threads.delete(wanted)
-      saveThreads()
+      forget(wanted)
       throw new Error('create вернул пустой sessionId')
     }
     if (sessionId !== wanted) {
-      threads.delete(wanted)
-      remember(sessionId)
+      forget(wanted)
+      remember(sessionId, workingSessionId)
     }
     const masked = makeAdviser(sessionId)
     const model = await applyChatModel(sessionId)
@@ -335,7 +431,7 @@ export function apply(ctx) {
   // restart: a resumed thread is masked before its first turn can run.
   ctx.on('agent/created', (payload) => {
     const agent = payload && payload.agent
-    if (!agent || !threads.has(agent.id)) return
+    if (!agent || !findThread(agent.id)) return
     try {
       makeAdviser(agent.id)
     } catch (error) {
@@ -369,7 +465,101 @@ export function apply(ctx) {
       }
 
       if (method === 'GET' && (rest === '/' || rest === '/status.json')) {
-        return sendJson(res, 200, { ok: true, value: { threads: [...threads] } })
+        return sendJson(res, 200, {
+          ok: true,
+          value: { threads: threads.map((row) => row.id), binding: threads.map((row) => ({ id: row.id, owner: row.owner })) },
+        })
+      }
+
+      // Support probe: what a page read actually returns for a thread.
+      if (method === 'GET' && rest === '/eventpage.json') {
+        const url = new URL(req.url ?? '/', 'http://localhost')
+        const sessionId = url.searchParams.get('sessionId') || ''
+        const controller = service(ctx, 'sessionController')
+        if (!controller || typeof controller.events !== 'function') {
+          return sendJson(res, 200, { ok: false, error: 'events недоступен' })
+        }
+        const cut = url.searchParams.get('throughSeq')
+        const request = { address: { kind: 'session', sessionId }, maxMessages: 12 }
+        if (cut !== null) request.throughSeq = Number(cut)
+        try {
+          const page = await controller.events(request, new AbortController().signal)
+          const records = (page && page.records) || []
+          return sendJson(res, 200, {
+            ok: true,
+            value: {
+              cursor: page && page.cursor,
+              hasMore: page && page.hasMore,
+              count: records.length,
+              types: records.map((entry) => entry && entry.event ? entry.event.type : 'raw'),
+              users: records
+                .map((entry) => (entry && entry.event) || null)
+                .filter((event) => event && event.type === 'user/message')
+                .map((event) => {
+                  const data = event.data || {}
+                  const content = Array.isArray(data.content) ? data.content : []
+                  const texts = content.filter((block) => block && typeof block.text === 'string')
+                  return {
+                    kind: data.source ? data.source.kind : null,
+                    blocks: content.map((block) => block && block.type),
+                    chars: texts.reduce((sum, block) => sum + block.text.length, 0),
+                  }
+                }),
+            },
+          })
+        } catch (error) {
+          return sendJson(res, 200, { ok: false, error: (error && error.message) || String(error) })
+        }
+      }
+
+      // History for the panel: threads bound to this working session, plus the free
+      // ones that belong to no session. Titles are resolved lazily and cached.
+      if (method === 'GET' && rest === '/threads.json') {
+        const url = new URL(req.url ?? '/', 'http://localhost')
+        const owner = url.searchParams.get('owner') || ''
+        const rows = [...threads].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+        const bound = []
+        const free = []
+        for (const row of rows) {
+          const title = await titleOf(row)
+          if (title === MISSING) {
+            // The Session was deleted outside the plugin; drop the stale entry.
+            forget(row.id)
+            continue
+          }
+          const item = { id: row.id, owner: row.owner, createdAt: row.createdAt, title }
+          if (row.owner === null || row.owner === '') free.push(item)
+          else if (owner !== '' && row.owner === owner) bound.push(item)
+        }
+        return sendJson(res, 200, { ok: true, value: { bound, free } })
+      }
+
+      // bind / unbind / forget one thread. Forget removes the registry entry only: the
+      // Session log stays on disk until the user deletes it.
+      if (method === 'POST' && rest === '/threads') {
+        const body = await readJsonBody(req)
+        const sessionId = body && body.sessionId
+        const action = body && body.action
+        if (typeof sessionId !== 'string' || sessionId === '') {
+          return sendJson(res, 200, { ok: false, error: 'sessionId is required' })
+        }
+        const record = findThread(sessionId)
+        if (!record) return sendJson(res, 200, { ok: false, error: 'unknown thread' })
+        if (action === 'bind') {
+          record.owner = typeof body.owner === 'string' && body.owner !== '' ? body.owner : null
+          saveThreads()
+          return sendJson(res, 200, { ok: true, value: { id: record.id, owner: record.owner } })
+        }
+        if (action === 'unbind') {
+          record.owner = null
+          saveThreads()
+          return sendJson(res, 200, { ok: true, value: { id: record.id, owner: null } })
+        }
+        if (action === 'forget') {
+          forget(sessionId)
+          return sendJson(res, 200, { ok: true, value: { forgotten: sessionId } })
+        }
+        return sendJson(res, 200, { ok: false, error: 'action must be bind, unbind or forget' })
       }
 
       // Same path the panel uses; kept as a route so the thread can be driven and
@@ -449,11 +639,11 @@ export function apply(ctx) {
         settings = { reasoningEffort: effort }
         writeSettings(settings)
         const failed = []
-        for (const id of threads) {
-          const applied = await applyChatModel(id, effort)
-          if (!applied.ok) failed.push(id + ': ' + applied.why)
+        for (const record of threads) {
+          const applied = await applyChatModel(record.id, effort)
+          if (!applied.ok) failed.push(record.id + ': ' + applied.why)
         }
-        return sendJson(res, 200, { ok: true, value: { reasoningEffort: effort, threads: threads.size, failed } })
+        return sendJson(res, 200, { ok: true, value: { reasoningEffort: effort, threads: threads.length, failed } })
       }
 
       if (method === 'POST' && rest === '/model') {

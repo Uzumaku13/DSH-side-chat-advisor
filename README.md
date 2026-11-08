@@ -141,6 +141,28 @@ The preset ships only reading tools. On top of that the host applies `tools.rest
 with an explicit allow-list whenever the agent is created. Either alone would do; both
 together mean a future edit to the preset cannot quietly hand the chat a shell.
 
+### History and binding
+
+Every thread belongs to exactly one place:
+
+- **bound** — created from a session, so it comes back when you open the panel in that
+  same session;
+- **free** — no owner, visible in every session's history.
+
+**`+` does not delete anything.** It creates a new thread bound to the current session and
+starts using it. The previous one stays in the history list, with its title taken from its
+first message.
+
+The clock button in the panel header opens the history: *Bound to this session* and *Free*.
+Click a row to switch, use the link icon to bind or unbind it, and `×` to remove it from the
+list. Removing the entry does **not** delete the conversation — it is an ordinary DSH
+session, and its log stays on disk until you delete it (`$DSH_HOME/sessions/<id>`). Entries
+whose session has already been deleted are pruned automatically the next time the history
+opens.
+
+Titles are read from the first human message of each thread and cached in the registry, so
+opening the history costs a page read per untitled thread and nothing afterwards.
+
 ### Why a preset ships with it
 
 Agent presets decide what reaches the model. Created on a coding preset, the thread would
@@ -168,14 +190,17 @@ driven without a browser:
 | `GET /x-side-chat/models.json` | Raw model catalog |
 | `GET /x-side-chat/tools.json` | Tool names the thread can see (debugging the mask) |
 | `GET /x-side-chat/status.json` | Known threads |
+| `GET /x-side-chat/threads.json?owner=` | History: threads bound to a session plus the free ones |
+| `POST /x-side-chat/threads` | `bind` / `unbind` / `forget` one thread |
+| `GET /x-side-chat/eventpage.json` | Support probe: what a page read returns for a thread |
 
 ### Files it writes
 
 | Path | Contents |
 |---|---|
-| `$DSH_HOME/side-chat/threads.json` | Thread ids (for re-applying the mask) |
+| `$DSH_HOME/side-chat/threads.json` | Thread records: id, owner, title, created (also the mask's list) |
 | `$DSH_HOME/side-chat/settings.json` | Reasoning level |
-| `localStorage: dsh.side-chat.thread.v2` | The thread the panel shows |
+| `localStorage: dsh.side-chat.thread.v3.<session>` | The thread the panel shows for that session |
 | `localStorage: dsh.side-chat.hide-claude-launcher` | The launcher toggle |
 
 Transcripts themselves are ordinary DSH session logs — nothing is stored twice.

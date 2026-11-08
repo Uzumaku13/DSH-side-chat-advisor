@@ -4,6 +4,35 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] — 2026-11-08
+
+### Added
+
+- **Thread history.** The clock button in the panel header lists the threads bound to the
+  current session and the free ones. A row switches the panel to that conversation; `×`
+  removes it from the list.
+- **Binding.** A thread created from a session is bound to it and returns when the panel is
+  opened in that session again. The link icon rebinds a thread or makes it free.
+- Titles from each thread's first human message, cached in the registry.
+- `GET /x-side-chat/threads.json?owner=`, `POST /x-side-chat/threads`
+  (`bind` / `unbind` / `forget`) and `GET /x-side-chat/eventpage.json` (support probe).
+
+### Changed
+
+- The registry file is now `{ version: 2, threads: [{ id, owner, title, createdAt }] }`.
+  A v1 file (a bare array of ids) is read and migrated on load; `owner` starts as `null`,
+  so existing conversations appear as free threads.
+- The panel remembers one thread **per working session** (`localStorage` key
+  `dsh.side-chat.thread.v3.<session>`), adopting the old single-thread key once.
+- Opening the panel prefers this session's newest bound thread; a free thread is never
+  adopted silently — it is reachable from history.
+
+### Fixed
+
+- Entries whose Session no longer exists are pruned when the history opens.
+- A rejected `throughSeq` read no longer cancels the title fallback, so threads created
+  before this release get their titles too.
+
 ## [1.1.0] — 2026-11-07
 
 ### Added
