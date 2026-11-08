@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] — 2026-11-08
+
+### Changed
+
+- **`+` creates a free thread.** Creating a conversation no longer binds it to the session it
+  was started from; binding is now a deliberate action. `POST /x-side-chat/thread` takes an
+  explicit `bind: true` when a caller wants the old behaviour.
+- The binding action in the history is a **pin** (⏸-style pushpin) instead of a link, and a
+  pinned row shows it in the accent colour with `aria-pressed`.
+
+### Notes
+
+- Opening the panel still prefers this session's pinned thread, then the thread remembered for
+  the session; a free thread is still never adopted silently.
+
 ## [1.2.1] — 2026-11-08
 
 ### Changed

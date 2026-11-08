@@ -145,20 +145,20 @@ together mean a future edit to the preset cannot quietly hand the chat a shell.
 
 Every thread belongs to exactly one place:
 
-- **bound** — created from a session, so it comes back when you open the panel in that
-  same session;
-- **free** — no owner, visible in every session's history.
+- **free** — the default. A thread created with `+` belongs to no session, is visible in every
+  session's history, and is never adopted silently;
+- **bound** — pinned to one session with the pin button in the history list, so the panel
+  opens it again when you come back to that session.
 
-**`+` does not delete anything.** It creates a new thread bound to the current session and
-starts using it. The previous one stays in the history list, with its title taken from its
-first message.
+**`+` does not delete anything.** It creates a free thread and starts using it. The previous
+one stays in the history list, titled by its first message.
 
 The clock button in the panel header opens the history: *Bound to this session* and *Free*.
-Click a row to switch, use the link icon to bind or unbind it, and `×` to remove it from the
-list. Removing the entry does **not** delete the conversation — it is an ordinary DSH
-session, and its log stays on disk until you delete it (`$DSH_HOME/sessions/<id>`). Entries
-whose session has already been deleted are pruned automatically the next time the history
-opens.
+Click a row to switch, use the pin to bind the thread to this session or unpin it, and `×` to
+remove it from the list. Removing the entry does **not** delete the conversation — it is an
+ordinary DSH session, and its log stays on disk until you delete it
+(`$DSH_HOME/sessions/<id>`). Entries whose session has already been deleted are pruned
+automatically the next time the history opens.
 
 Titles are read from the first human message of each thread and cached in the registry, so
 opening the history costs a page read per untitled thread and nothing afterwards.

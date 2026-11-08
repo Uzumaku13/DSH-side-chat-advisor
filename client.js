@@ -191,6 +191,7 @@ window.__ModuleLoader__.load({
       .dshsc-hist__act { flex:0 0 auto; width:22px; height:22px; padding:0; border:none; border-radius:6px;
         background:none; cursor:pointer; color:var(--dsw-alias-label-secondary); font-size:14px; line-height:1; }
       .dshsc-hist__act:hover { background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-primary); }
+      .dshsc-hist__act--on { color:var(--dsw-alias-brand-primary); }
       .dshsc__icon--on { background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-primary); }
       .dshsc__head { flex:0 0 auto; display:flex; align-items:center; gap:8px;
         padding:10px 12px; border-bottom:1px solid var(--dsw-alias-border-l1); font-weight:500; }
@@ -373,7 +374,8 @@ window.__ModuleLoader__.load({
         const response = await fetch('/x-side-chat/thread', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ workingSessionId }),
+          // Free by default: pinning to a session is done from the history list.
+          body: JSON.stringify({ workingSessionId, bind: false }),
         });
         const payload = await response.json().catch(() => null);
         if (!payload || payload.ok !== true) throw new Error((payload && payload.error) || ('HTTP ' + response.status));
@@ -927,15 +929,19 @@ window.__ModuleLoader__.load({
           h('span', { className: 'dshsc-hist__meta' }, (item.owner ? t('bound') : t('free')) + ' · ' + timeLabel(item.createdAt)),
         ),
         h('button', {
-          className: 'dshsc-hist__act',
+          className: 'dshsc-hist__act' + (item.owner ? ' dshsc-hist__act--on' : ''),
           type: 'button',
           title: item.owner ? t('freeIt') : t('bind'),
           'aria-label': item.owner ? t('freeIt') : t('bind'),
+          'aria-pressed': Boolean(item.owner),
           onClick: () => changeBinding(item, item.owner ? 'unbind' : 'bind'),
         }, h('svg', { viewBox: '0 0 24 24', width: 13, height: 13, fill: 'none', 'aria-hidden': true },
           h('path', {
-            d: item.owner ? 'M9 15l6-6M8.5 8.5l-1.7 1.7a4.2 4.2 0 0 0 5.9 5.9l1.7-1.7M15.5 15.5l1.7-1.7a4.2 4.2 0 0 0-5.9-5.9l-1.7 1.7' : 'M9.5 14.5l5-5M8 12l-2 2a4 4 0 0 0 5.6 5.6l2-2M16 12l2-2a4 4 0 0 0-5.6-5.6l-2 2',
-            stroke: 'currentColor', 'stroke-width': '1.6', 'stroke-linecap': 'round',
+            d: 'M9.5 3.5h5M10.5 3.5V8L8 11.5V13h8v-1.5L13.5 8V3.5M12 13v7.5',
+            stroke: 'currentColor',
+            'stroke-width': item.owner ? '1.9' : '1.5',
+            'stroke-linecap': 'round',
+            'stroke-linejoin': 'round',
           }))),
         h('button', {
           className: 'dshsc-hist__act',

@@ -400,7 +400,7 @@ export function apply(ctx) {
     return { ok: true, why: base.provider + '/' + base.model + ' effort=' + wanted }
   }
 
-  const createThread = async (workingSessionId) => {
+  const createThread = async (workingSessionId, bind) => {
     const controller = service(ctx, 'sessionController')
     if (!controller || typeof controller.create !== 'function') {
       throw new Error('sessionController недоступен на хосте')
@@ -409,7 +409,10 @@ export function apply(ctx) {
     // Name the Session ourselves and remember it *before* creation, so the
     // `agent/created` hook already knows this agent is an adviser.
     const wanted = 'session-' + randomUUID()
-    remember(wanted, workingSessionId)
+    // Threads are free unless the caller asks for a binding: pinning is a deliberate
+    // action in the history list, not a side effect of pressing "+".
+    const owner = bind === true ? workingSessionId : null
+    remember(wanted, owner)
     const request = { sessionId: wanted, agentPreset: PRESET_ID }
     if (cwd !== undefined) request.cwd = cwd
     const created = await controller.create(request)
@@ -420,7 +423,7 @@ export function apply(ctx) {
     }
     if (sessionId !== wanted) {
       forget(wanted)
-      remember(sessionId, workingSessionId)
+      remember(sessionId, owner)
     }
     const masked = makeAdviser(sessionId)
     const model = await applyChatModel(sessionId)
@@ -447,7 +450,7 @@ export function apply(ctx) {
 
       if (method === 'POST' && rest === '/thread') {
         const body = await readJsonBody(req)
-        const value = await createThread(body && body.workingSessionId)
+        const value = await createThread(body && body.workingSessionId, body && body.bind === true)
         return sendJson(res, 200, { ok: true, value })
       }
 
